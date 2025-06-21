@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Google-Style Review Platform</title>
+  <style>
+    body {
+      font-family: "Segoe UI", sans-serif;
+      background: #f1f3f4;
+      margin: 0;
+      padding: 0;
+    }
+
+    .container {
+      max-width: 650px;
+      margin: 40px auto;
+      background: white;
+      padding: 20px 30px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      border-radius: 12px;
+    }
+
+    h2 {
+      text-align: center;
+      color: #202124;
+    }
+
+    .star-rating {
+      display: flex;
+      justify-content: center;
+      margin: 15px 0;
+    }
+
+    .star {
+      font-size: 32px;
+      color: #ccc;
+      cursor: pointer;
+      transition: color 0.2s;
+    }
+
+    .star.hover,
+    .star.selected {
+      color: #fbbc04;
+    }
+
+    input, textarea, select {
+      width: 100%;
+      padding: 10px;
+      margin: 8px 0;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 16px;
+    }
+
+    button {
+      background: #1a73e8;
+      color: white;
+      border: none;
+      padding: 12px;
+      font-size: 16px;
+      width: 100%;
+      border-radius: 6px;
+      margin-top: 10px;
+      cursor: pointer;
+    }
+
+    .review {
+      background: #fff;
+      border: 1px solid #ddd;
+      border-left: 5px solid #1a73e8;
+      margin-top: 20px;
+      padding: 15px;
+      border-radius: 6px;
+      position: relative;
+    }
+
+    .review h4 {
+      margin: 0;
+      color: #202124;
+    }
+
+    .review small {
+      color: gray;
+    }
+
+    .review p {
+      margin: 6px 0 0;
+    }
+
+    .review img {
+      max-width: 100%;
+      margin-top: 10px;
+      border-radius: 6px;
+    }
+
+    .review .actions {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+    }
+
+    .review .actions button {
+      background: transparent;
+      color: #1a73e8;
+      border: none;
+      font-size: 14px;
+      cursor: pointer;
+      margin-left: 10px;
+    }
+
+    #controls {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 10px;
+    }
+
+    #thankYou {
+      color: green;
+      text-align: center;
+      margin: 10px 0;
+      display: none;
+    }
+
+    @media (max-width: 600px) {
+      .container {
+        margin: 20px;
+      }
+
+      .star {
+        font-size: 28px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h2>🌟 Google-Style Review</h2>
+
+  <input type="text" id="name" placeholder="Your name" />
+  
+  <div class="star-rating" id="starContainer">
+    <span class="star" data-value="1">&#9733;</span>
+    <span class="star" data-value="2">&#9733;</span>
+    <span class="star" data-value="3">&#9733;</span>
+    <span class="star" data-value="4">&#9733;</span>
+    <span class="star" data-value="5">&#9733;</span>
+  </div>
+
+  <textarea id="comment" rows="4" placeholder="Share details of your experience..."></textarea>
+  <input type="file" id="imageUpload" accept="image/*" />
+
+  <button onclick="submitReview()">Post Review</button>
+
+  <div id="thankYou">✅ Thanks for your review!</div>
+
+  <div id="controls">
+    <select id="sortBy" onchange="sortReviews()">
+      <option value="newest">Sort: Newest</option>
+      <option value="oldest">Oldest</option>
+      <option value="highest">Highest Rating</option>
+      <option value="lowest">Lowest Rating</option>
+    </select>
+    <button onclick="exportReviews()">📁 Export</button>
+  </div>
+
+  <div id="reviewsContainer"></div>
+</div>
+
+<script>
+  const stars = document.querySelectorAll(".star");
+  let selectedRating = 0;
+  let hoverRating = 0;
+  let reviews = JSON.parse(localStorage.getItem("reviews")) || [];
+  let editIndex = -1;
+
+  stars.forEach(star => {
+    star.addEventListener("mouseover", () => {
+      hoverRating = parseInt(star.dataset.value);
+      updateStars();
+    });
+
+    star.addEventListener("mouseout", () => {
+      hoverRating = 0;
+      updateStars();
+    });
+
+    star.addEventListener("click", () => {
+      selectedRating = parseInt(star.dataset.value);
+      updateStars();
+    });
+  });
+
+  function updateStars() {
+    stars.forEach(star => {
+      const val = parseInt(star.dataset.value);
+      star.classList.remove("hover", "selected");
+
+      if (hoverRating >= val) {
+        star.classList.add("hover");
+      } else if (hoverRating === 0 && selectedRating >= val) {
+        star.classList.add("selected");
+      }
+    });
+  }
+
+  function submitReview() {
+    const name = document.getElementById("name").value.trim();
+    const comment = document.getElementById("comment").value.trim();
+    const imageInput = document.getElementById("imageUpload");
+
+    if (!name || !comment || !selectedRating) {
+      alert("Please fill all fields and select a star rating.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = function () {
+      const image = imageInput.files[0] ? reader.result : "";
+
+      const review = { name, rating: selectedRating, comment, image, date: new Date().toISOString() };
+
+      if (editIndex === -1) {
+        reviews.unshift(review);
+      } else {
+        reviews[editIndex] = review;
+        editIndex = -1;
+      }
+
+      localStorage.setItem("reviews", JSON.stringify(reviews));
+      resetForm();
+      displayThankYou();
+      displayReviews();
+    };
+
+    if (imageInput.files[0]) {
+      reader.readAsDataURL(imageInput.files[0]);
+    } else {
+      reader.onloadend();
+    }
+  }
+
+  function resetForm() {
+    document.getElementById("name").value = "";
+    document.getElementById("comment").value = "";
+    document.getElementById("imageUpload").value = "";
+    selectedRating = 0;
+    updateStars();
+  }
+
+  function displayThankYou() {
+    const msg = document.getElementById("thankYou");
+    msg.style.display = "block";
+    setTimeout(() => {
+      msg.style.display = "none";
+    }, 2500);
+  }
+
+  function displayReviews() {
+    const container = document.getElementById("reviewsContainer");
+    container.innerHTML = "";
+
+    let sorted = [...reviews];
+    const sortBy = document.getElementById("sortBy").value;
+
+    if (sortBy === "newest") sorted.sort((a, b) => new Date(b.date) - new Date(a.date));
+    if (sortBy === "oldest") sorted.sort((a, b) => new Date(a.date) - new Date(b.date));
+    if (sortBy === "highest") sorted.sort((a, b) => b.rating - a.rating);
+    if (sortBy === "lowest") sorted.sort((a, b) => a.rating - b.rating);
+
+    sorted.forEach((rev, index) => {
+      const div = document.createElement("div");
+      div.className = "review";
+      div.innerHTML = `
+        <h4>${rev.name}</h4>
+        <small>${"⭐".repeat(rev.rating)} (${rev.rating}/5)</small>
+        <p>${rev.comment}</p>
+        ${rev.image ? `<img src="${rev.image}" alt="Uploaded image" />` : ""}
+        <div class="actions">
+          <button onclick="editReview(${index})">Edit</button>
+          <button onclick="deleteReview(${index})">Delete</button>
+        </div>
+      `;
+      container.appendChild(div);
+    });
+  }
+
+  function editReview(index) {
+    const rev = reviews[index];
+    document.getElementById("name").value = rev.name;
+    document.getElementById("comment").value = rev.comment;
+    selectedRating = rev.rating;
+    updateStars();
+    editIndex = index;
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function deleteReview(index) {
+    if (confirm("Delete this review?")) {
+      reviews.splice(index, 1);
+      localStorage.setItem("reviews", JSON.stringify(reviews));
+      displayReviews();
+    }
+  }
+
+  function sortReviews() {
+    displayReviews();
+  }
+
+  function exportReviews() {
+    if (reviews.length === 0) return alert("No reviews to export.");
+    let content = "Google-Style Reviews:\n\n";
+    reviews.forEach((rev, i) => {
+      content += `Review ${i + 1}\nName: ${rev.name}\nRating: ${rev.rating}/5\nComment: ${rev.comment}\n\n`;
+    });
+
+    const blob = new Blob([content], { type: "text/plain" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "reviews.txt";
+    link.click();
+  }
+
+  // Load on page load
+  displayReviews();
+</script>
+</body>
+</html>
